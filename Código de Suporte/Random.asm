@@ -3,7 +3,7 @@
 ;   
 ;	ANO LECTIVO 2020/2021
 ;--------------------------------------------------------------
-; Demostração duma rotina de calculo de números aleatórios 
+; Demostraï¿½ï¿½o duma rotina de calculo de nï¿½meros aleatï¿½rios 
 ;
 ;--------------------------------------------------------------
 
@@ -45,7 +45,7 @@ PRINC ENDP
 ;CalcAleat - calcula um numero aleatorio de 16 bits
 ;Parametros passados pela pilha
 ;entrada:
-;não tem parametros de entrada
+;nï¿½o tem parametros de entrada
 ;saida:
 ;param1 - 16 bits - numero aleatorio calculado
 ;notas adicionais:
@@ -67,12 +67,12 @@ CalcAleat proc near
 
 	add	dx,ultimo_num_aleat
 	add	cx,dx	
-	mov	ax,65521
+	mov	ax,80
 	push	dx
 	mul	cx
 	pop	dx
 	xchg	dl,dh
-	add	dx,32749
+	add	dx,0
 	add	dx,ax
 
 	mov	ultimo_num_aleat,dx
@@ -94,7 +94,7 @@ CalcAleat endp
 ;param2 -  8 bits - posicao y
 ;param3 - 16 bits - numero a imprimir
 ;saida:
-;não tem parametros de saída
+;nï¿½o tem parametros de saï¿½da
 ;notas adicionais:
 ; deve estar definida uma variavel => str_num db 5 dup(?),'$'
 ; assume-se que DS esta a apontar para o segmento onde esta armazenada str_num
