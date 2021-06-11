@@ -3,10 +3,9 @@
 ;   
 ;	ANO LECTIVO 2020/2021
 ;--------------------------------------------------------------
-; Demostra��o da navega��o do Ecran com um avatar
 ;
-;		arrow keys to move 
-;		press ESC to exit
+;		Tomás Gomes Silva 				- 2020143845
+;		João Miguel Duarte dos Santos 	- 2020136093
 ;
 ;--------------------------------------------------------------
 
@@ -27,14 +26,16 @@ dseg	segment para public 'data'
 		Old_seg			dw		0				; Guarda os �ltimos segundos que foram lidos
 		Tempo_init		dw		0				; Guarda O Tempo de inicio do jogo
 		Tempo_j			dw		0				; Guarda O Tempo que decorre o  jogo
-		Tempo_limite	dw		100				; tempo m�ximo de Jogo
+		Tempo_limite	dw		99				; tempo m�ximo de Jogo
 		String_TJ		db		"   /100$"
 
 		String_num 		db 		"  0 $"
-        String_nome  	db	    "ISEC  $"	
-		Construir_nome	db	    "            $"	
+        String_nome  	db	    "FIO     $"	
+		Construir_nome	db	    "        $"	
+
 		Dim_nome		dw		5	; Comprimento do Nome
 		indice_nome		dw		0	; indice que aponta para Construir_nome
+		Nivel			dw		1
 		
 		Fim_Ganhou		db	    " Ganhou $"	
 		Fim_Perdeu		db	    " Perdeu $"	
@@ -42,9 +43,14 @@ dseg	segment para public 'data'
         Erro_Open       db      'Erro ao tentar abrir o ficheiro$'
         Erro_Ler_Msg    db      'Erro ao tentar ler do ficheiro$'
         Erro_Close      db      'Erro ao tentar fechar o ficheiro$'
+
         Fich         	db      'labi.TXT',0
+		Fich_menu       db      'menu.TXT',0
         HandleFich      dw      0
         car_fich        db      ?
+
+		ultimo_num_aleat dw 0
+		str_num db 5 dup(?),'$'
 
 		string			db	"Teste pr�tico de T.I",0
 		Car				db	32	; Guarda um caracter do Ecran 
@@ -57,7 +63,6 @@ dseg	ends
 
 cseg	segment para public 'code'
 assume		cs:cseg, ds:dseg
-
 
 
 ;########################################################################
@@ -73,9 +78,13 @@ endm
 ; MOSTRA - Faz o display de uma string terminada em $
 
 MOSTRA MACRO STR 
+	PUSH AX
+	PUSH DX
 	MOV AH,09H
 	LEA DX,STR 
 	INT 21H
+	POP DX
+	POP AX
 ENDM
 
 ; FIM DAS MACROS
@@ -102,6 +111,60 @@ apaga_ecran	endp
 ;########################################################################
 ; IMP_FICH
 
+; MENU INICIAL - Mostra o menu principal
+IMP_MENU	PROC
+
+		;abre ficheiro
+        mov     ah,3dh
+        mov     al,0
+        lea     dx,Fich_menu
+        int     21h
+        jc      erro_abrir
+        mov     HandleFich,ax
+        jmp     ler_ciclo
+		mov		ah,4CH
+		INT		21h
+
+erro_abrir:
+        mov     ah,09h
+        lea     dx,Erro_Open
+        int     21h
+        jmp     sai_f
+
+ler_ciclo:
+        mov     ah,3fh
+        mov     bx,HandleFich
+        mov     cx,1
+        lea     dx,car_fich
+        int     21h
+		jc		erro_ler
+		cmp		ax,0		;EOF?
+		je		fecha_ficheiro
+        mov     ah,02h
+		mov		dl,car_fich
+		int		21h
+		jmp		ler_ciclo
+
+erro_ler:
+        mov     ah,09h
+        lea     dx,Erro_Ler_Msg
+        int     21h
+
+fecha_ficheiro:
+        mov     ah,3eh
+        mov     bx,HandleFich
+        int     21h
+        jnc     sai_f
+
+        mov     ah,09h
+        lea     dx,Erro_Close
+        Int     21h
+sai_f:	
+		RET
+
+IMP_MENU ENDP
+
+; MOSTRA LABIRINTO - Mostra o labirinto escrito no ficheiro labi.txt
 IMP_FICH	PROC
 
 		;abre ficheiro
@@ -112,6 +175,8 @@ IMP_FICH	PROC
         jc      erro_abrir
         mov     HandleFich,ax
         jmp     ler_ciclo
+		INT 	21h
+
 
 erro_abrir:
         mov     ah,09h
@@ -170,7 +235,7 @@ Trata_Horas PROC
 		inc		Tempo_j
 
 		MOV 	AX, Tempo_j
-		MOV 	BX, 100
+		MOV 	BX, Tempo_limite
 		cmp 	AX, BX
 		je		JOGO_TERMINOU_TEMPO
 
@@ -218,10 +283,16 @@ Trata_Horas PROC
 		MOV 	String_TJ[0],'0' 
 		MOV 	String_TJ[1],al 
 		MOV 	String_TJ[2],ah	
+
+		mov 	ax,Tempo_limite
+		MOV		bl, 10     
+		div 	bl
+		add 	al, 30h				; Caracter Correspondente às dezenas
+		add		ah,	30h
 		MOV 	String_TJ[3],'/'	
-		MOV 	String_TJ[4],'1'	
-		MOV 	String_TJ[5],'0'	
-		MOV 	String_TJ[6],'0'
+		MOV 	String_TJ[4],'0'	
+		MOV 	String_TJ[5], al	
+		MOV 	String_TJ[6], ah
 		MOV 	String_TJ[7],'$'	
 		GOTO_XY	59,0
 		MOSTRA	String_TJ
@@ -238,6 +309,41 @@ fim_horas:
 		RET		
 			
 Trata_Horas ENDP
+
+
+Ler_TEMPO PROC	
+ 
+		PUSH AX
+		PUSH BX
+		PUSH CX
+		PUSH DX
+	
+		PUSHF
+		
+		MOV AH, 2CH             ; Buscar a hORAS
+		INT 21H                 
+		
+		XOR AX,AX
+		MOV AL, DH              ; segundos para al
+		mov Segundos, AX		; guarda segundos na variavel correspondente
+		
+		XOR AX,AX
+		MOV AL, CL              ; Minutos para al
+		mov Minutos, AX         ; guarda MINUTOS na variavel correspondente
+		
+		XOR AX,AX
+		MOV AL, CH              ; Horas para al
+		mov Horas,AX			; guarda HORAS na variavel correspondente
+ 
+		POPF
+		POP DX
+		POP CX
+		POP BX
+		POP AX
+ 		RET 
+Ler_TEMPO   ENDP 
+
+
 
 
 ;########################################################################
@@ -268,10 +374,17 @@ LE_TECLA	endp
 
 
 
+
 ;########################################################################
 ; Avatar
 
 AVATAR	PROC
+
+			
+			JMP CALC_RANDOM_Y
+			JMP CALC_RANDOM_X
+			goto_xy	POSx,POSy
+
 			mov		ax,0B800h
 			mov		es,ax
 			goto_xy	POSx,POSy		; Vai para nova possi��o
@@ -282,7 +395,65 @@ AVATAR	PROC
 			mov		Cor, ah			; Guarda a cor que est� na posi��o do Cursor	
 	
 
+CALC_RANDOM_X:
+	call	CalcAleat
+	pop	ax
+	CMP AX, 72
+	JNBE 	CALC_RANDOM_X
+	MOV POSx, AL
+	MOV POSxa, AL
+	JMP CALC_RANDOM_Y
+
+CALC_RANDOM_Y:
+	call	CalcAleat
+	pop	ax
+	CMP AX, 18
+	JNBE 	CALC_RANDOM_Y
+	MOV POSy, AL
+	MOV POSya, AL
+	JMP CHECK_COORDS
+
+CHECK_COORDS:
+	goto_xy	POSx,POSy
+	mov 	ah, 08h
+	int 	10H 
+	CMP		AL, ' '
+	JE 		CICLO
+	JMP 	CALC_RANDOM_X
+
+FIM_LETRA:	
+	MOV SI, -1
+	goto_xy		POSx,POSy
+	JMP CHECK_VITORIA
+
+CHECK_LETRA:
+	INC SI
+	MOV AL, String_nome[SI]
+	CMP AL, ' '
+	JE FIM_LETRA
+	CMP AL, CL
+	JNE CHECK_LETRA
+	MOV Construir_nome[SI], CL
+	goto_xy		10,21
+	MOSTRA 		Construir_nome
+	JMP CHECK_LETRA
+
+CHECK_VITORIA:
+	INC SI
+	MOV AL, String_nome[SI]
+	MOV AH, Construir_nome[SI]
+	CMP AL, ' '
+	JE JOGO_TERMINOU_VITORIA
+	CMP AL, AH
+	JNE IMPRIME
+	JMP CHECK_VITORIA
+
+
 CICLO:		
+
+			goto_xy		10,20
+			MOSTRA 		String_nome
+
 			goto_xy	POSxa,POSya		; Vai para a posi��o anterior do cursor
 			mov		ah, 02h
 			mov		dl, Car			; Repoe Caracter guardado 
@@ -298,15 +469,22 @@ CICLO:
 			goto_xy	76,0			; Mostra o caractr que estava na posi��o do AVATAR
 			mov		ah, 02h			; IMPRIME caracter da posi��o no canto
 			mov		dl, Car	
-			int		21H
-	
+			int		21H		
+
+			MOV		SI, -1
+			MOV		CL, DL
+			CMP		CL, ' '
+			JNE		CHECK_LETRA
+
 			goto_xy	POSx,POSy		; Vai para posi��o do cursor
 
 
-IMPRIME:	mov		ah, 02h
+IMPRIME:
+
+			mov		ah, 02h
 			mov		dl, 190	; Coloca AVATAR
 			int		21H	
-			goto_xy	POSx,POSy	; Vai para posi��o do cursor
+			goto_xy	POSxa,POSya	; Vai para posi��o do cursor
 		
 			mov		al, POSx	; Guarda a posi��o do cursor
 			mov		POSxa, al
@@ -375,42 +553,19 @@ DIREITA:
 			dec 	POSx
 			goto_xy	POSx,POSy
 			jmp 	CICLO
+	
 
 fim:				
 			RET
 AVATAR		endp
 
-Ler_TEMPO PROC	
- 
-		PUSH AX
-		PUSH BX
-		PUSH CX
-		PUSH DX
-	
-		PUSHF
-		
-		MOV AH, 2CH             ; Buscar a hORAS
-		INT 21H                 
-		
-		XOR AX,AX
-		MOV AL, DH              ; segundos para al
-		mov Segundos, AX		; guarda segundos na variavel correspondente
-		
-		XOR AX,AX
-		MOV AL, CL              ; Minutos para al
-		mov Minutos, AX         ; guarda MINUTOS na variavel correspondente
-		
-		XOR AX,AX
-		MOV AL, CH              ; Horas para al
-		mov Horas,AX			; guarda HORAS na variavel correspondente
- 
-		POPF
-		POP DX
-		POP CX
-		POP BX
-		POP AX
- 		RET 
-Ler_TEMPO   ENDP 
+JOGO_TERMINOU_GANHOU PROC
+	CALL 		apaga_ecran
+	goto_xy		1, 1
+	MOSTRA		Fim_Ganhou
+	MOV			AH,4CH
+	INT			21H
+JOGO_TERMINOU_GANHOU ENDP
 
 JOGO_TERMINOU_TEMPO PROC
 	CALL 		apaga_ecran
@@ -420,21 +575,204 @@ JOGO_TERMINOU_TEMPO PROC
 	INT			21H
 JOGO_TERMINOU_TEMPO ENDP
 
+JOGO_TERMINOU_VITORIA PROC
+	MOV			AX, 10
+	SUB			Tempo_limite, AX
+	XOR			AX, AX	
+	MOV			Tempo_j, AX
+	CALL 		Trata_Horas	
+	INC 		Nivel
+
+	MOV AX, 2
+	CMP AX, Nivel
+	JE 	CARREGAR_NIVEL_2
+	MOV AX, 3
+	CMP AX, Nivel
+	JE 	CARREGAR_NIVEL_3
+	MOV AX, 4
+	CMP AX, Nivel
+	JE 	CARREGAR_NIVEL_4
+	MOV AX, 5
+	CMP AX, Nivel
+	JE 	CARREGAR_NIVEL_5
+	MOV AX, 6
+	
+	CALL JOGO_TERMINOU_GANHOU
+
+CARREGAR_NIVEL_2:
+	MOV 	String_nome[0],'M'
+	MOV 	String_nome[1],'E'
+	MOV 	String_nome[2],'D'
+	MOV 	String_nome[3],'O'
+
+	MOV 	Construir_nome[0],' '
+	MOV 	Construir_nome[1],' '
+	MOV 	Construir_nome[2],' '
+	MOV 	Construir_nome[3],' '
+	MOV 	Construir_nome[4],' '
+	MOV 	Construir_nome[5],' '
+	MOV 	Construir_nome[6],' '
+
+	goto_xy		10,20
+	MOSTRA 		String_nome
+	goto_xy		10,21
+	MOSTRA 		Construir_nome
+
+	JMP 		AVATAR
+
+CARREGAR_NIVEL_3:
+	MOV 	String_nome[0],'P'
+	MOV 	String_nome[1],'R'
+	MOV 	String_nome[2],'A'
+	MOV 	String_nome[3],'I'
+	MOV 	String_nome[4],'A'
+
+	MOV 	Construir_nome[0],' '
+	MOV 	Construir_nome[1],' '
+	MOV 	Construir_nome[2],' '
+	MOV 	Construir_nome[3],' '
+	MOV 	Construir_nome[4],' '
+	MOV 	Construir_nome[5],' '
+	MOV 	Construir_nome[6],' '
+
+	goto_xy		10,20
+	MOSTRA 		String_nome
+	goto_xy		10,21
+	MOSTRA 		Construir_nome
+
+	JMP 		AVATAR
+
+CARREGAR_NIVEL_4:
+	MOV 	String_nome[0],'P'
+	MOV 	String_nome[1],'L'
+	MOV 	String_nome[2],'A'
+	MOV 	String_nome[3],'N'
+	MOV 	String_nome[4],'T'
+	MOV 	String_nome[5],'A'
+
+	MOV 	Construir_nome[0],' '
+	MOV 	Construir_nome[1],' '
+	MOV 	Construir_nome[2],' '
+	MOV 	Construir_nome[3],' '
+	MOV 	Construir_nome[4],' '
+	MOV 	Construir_nome[5],' '
+	MOV 	Construir_nome[6],' '
+
+	goto_xy		10,20
+	MOSTRA 		String_nome
+	goto_xy		10,21
+	MOSTRA 		Construir_nome
+
+	JMP 		AVATAR
+
+CARREGAR_NIVEL_5:
+	MOV 	String_nome[0],'V'
+	MOV 	String_nome[1],'I'
+	MOV 	String_nome[2],'R'
+	MOV 	String_nome[3],'T'
+	MOV 	String_nome[4],'U'
+	MOV 	String_nome[5],'A'
+	MOV 	String_nome[6],'L'
+
+	MOV 	Construir_nome[0],' '
+	MOV 	Construir_nome[1],' '
+	MOV 	Construir_nome[2],' '
+	MOV 	Construir_nome[3],' '
+	MOV 	Construir_nome[4],' '
+	MOV 	Construir_nome[5],' '
+	MOV 	Construir_nome[6],' '
+
+	goto_xy		10,20
+	MOSTRA 		String_nome
+	goto_xy		10,21
+	MOSTRA 		Construir_nome
+
+	JMP 		AVATAR
+
+
+JOGO_TERMINOU_VITORIA ENDP
+
+CalcAleat proc near
+
+	sub	sp,2
+	push	bp
+	mov	bp,sp
+	push	ax
+	push	cx
+	push	dx	
+	mov	ax,[bp+4]
+	mov	[bp+2],ax
+
+	mov	ah,00h
+	int	1ah
+
+	add	dx,ultimo_num_aleat
+	add	cx,dx	
+	mov	ax,80
+	push	dx
+	mul	cx
+	pop	dx
+	xchg	dl,dh
+	add	dx,0
+	add	dx,ax
+
+	mov	ultimo_num_aleat,dx
+
+	mov	[BP+4],dx
+
+	pop	dx
+	pop	cx
+	pop	ax
+	pop	bp
+	ret
+CalcAleat endp
+
+
 ;########################################################################
 Main  proc
+
 		mov			ax, dseg
 		mov			ds,ax
-		
+
 		mov			ax,0B800h
 		mov			es,ax
-		
+
 		call		apaga_ecran
 		goto_xy		0,0
-		call		IMP_FICH
-		call 		AVATAR
-		goto_xy		0,22
-		mov			ah,4CH
-		INT			21H
+		call		IMP_MENU
+		
+MENU_PRINCIPAL:
+	MOV	AH,0BH
+	INT 21h
+	CMP AL, 0 ; sem tecla
+	JE MENU_PRINCIPAL
+
+	xor ax, ax
+
+	mov		ah,08h
+	int		21h
+	cmp		al,'1' ; tecla para jogar
+	je		PRINT_LAB 
+
+	xor ax, ax
+
+	mov		ah,08h
+	int		21h
+	cmp		al,'2' ; tecla para sair
+	je		SAIR 
+
+	jmp MENU_PRINCIPAL
+
+
+PRINT_LAB:
+	call		apaga_ecran
+	goto_xy		0,0
+	call		IMP_FICH
+	call 		AVATAR
+
+SAIR:
+	mov			ah,4CH
+	INT			21h
 Main	endp
 Cseg	ends
 end	Main
