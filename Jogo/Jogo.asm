@@ -449,7 +449,7 @@ CHECK_VITORIA:
 	JMP CHECK_VITORIA
 
 
-CICLO:		
+CICLO:     
 
 			goto_xy		10,20
 			MOSTRA 		String_nome
